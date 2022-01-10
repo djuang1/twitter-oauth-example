@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:os="http://www.mulesoft.org/schema/mule/os"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="2ce99d81-c10b-49e6-bdc0-6ea2578dd7e3" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="Twitter_Request_configuration" doc:name="HTTP Request configuration" doc:id="35535177-7fd8-48d8-9b9d-b761f3e67cb8" >
+		<http:request-connection protocol="HTTPS" host="api.twitter.com" port="443" />
+	</http:request-config>
+	<configuration-properties doc:name="Configuration properties" doc:id="9627bf56-b96c-4cc3-89f7-ea6e3afccbf0" file="mule-properties.yaml" />
+	<flow name="twitter-oauth-exampleFlow1" doc:id="9a6281ca-df8a-4a83-a400-6c5cdcb93df6" >
+		<http:listener doc:name="/auth" doc:id="a31bad3d-58ed-4dc5-954f-565f59a2556e" config-ref="HTTP_Listener_config" path="/auth"/>
+		<http:request method="POST" doc:name="oauth2/token" doc:id="fa1ea5b2-7e71-48f3-97cd-3c40226208af" config-ref="Twitter_Request_configuration" path="/oauth2/token">
+			<http:headers ><![CDATA[#[import toBase64 from dw::core::Binaries
+var myBinary = p('twitter.api_key') ++ ":" ++ p('twitter.api_secret') as Binary
+output application/java
+---
+{
+	"Authorization" : "Basic " ++ toBase64(myBinary)
+}]]]></http:headers>
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"grant_type" : "client_credentials"
+}]]]></http:query-params>
+		</http:request>
+		<os:store doc:name="Store" doc:id="0f460fcb-4edd-4340-a32b-2574834e8bda" key="access_token">
+			<os:value ><![CDATA[#[payload.access_token]]]></os:value>
+		</os:store>
+		<ee:transform doc:name="Transform Message" doc:id="cc50a693-4e09-4cf0-b9c8-ec1ffc2bbcb2" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="twitter-oauth-exampleFlow" doc:id="2f8bb267-fd5b-4ace-8218-8b8f8bea4922" >
+		<http:listener doc:name="Listener" doc:id="05e522dc-2e13-4974-a70b-7f482e502ab9" config-ref="HTTP_Listener_config" path="/list"/>
+		<os:retrieve doc:name="Retrieve" doc:id="1f9cb687-b177-467c-886f-87bfc38e53fb" key="access_token" target="bearer_token">
+			<os:default-value ><![CDATA["1"]]></os:default-value>
+		</os:retrieve>
+		<http:request method="GET" doc:name="Request" doc:id="56c4acf2-f2be-4928-84b6-ac7dd5099288" config-ref="Twitter_Request_configuration" path="/2/tweets/search/recent">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.bearer_token
+}]]]></http:headers>
+			<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"query" : "MuleSoft"
+}]]]></http:query-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message" doc:id="35278ab0-cbcc-47b5-a622-429e3547ccf8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
